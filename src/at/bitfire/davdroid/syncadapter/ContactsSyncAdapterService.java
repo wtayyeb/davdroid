@@ -26,6 +26,7 @@ import at.bitfire.davdroid.resource.CardDavAddressBook;
 import at.bitfire.davdroid.resource.LocalAddressBook;
 import at.bitfire.davdroid.resource.LocalCollection;
 import at.bitfire.davdroid.resource.RemoteCollection;
+import at.bitfire.davdroid.webdav.TlsSniSocketFactory;
 
 public class ContactsSyncAdapterService extends Service {
 	private static ContactsSyncAdapter syncAdapter;
@@ -55,6 +56,7 @@ public class ContactsSyncAdapterService extends Service {
 		
 		private ContactsSyncAdapter(Context context) {
 			super(context);
+			TlsSniSocketFactory.setAndroidContext(context);
 			Log.i(TAG, "httpClient = " + httpClient);
 		}
 

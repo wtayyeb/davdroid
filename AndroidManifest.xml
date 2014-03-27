@@ -72,6 +72,7 @@
             android:name=".syncadapter.AddAccountActivity"
             android:excludeFromRecents="true" >
         </activity>
+	<activity android:name="de.duenndns.ssl.MemorizingActivity" />
     </application>
 
 </manifest>

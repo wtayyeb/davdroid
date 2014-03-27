@@ -22,13 +22,15 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.TextView;
+import at.bitfire.davdroid.webdav.TlsSniSocketFactory;
 
 public class MainActivity extends Activity {
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
-		
+
+		TlsSniSocketFactory.setAndroidContext(getApplicationContext());
 		setContentView(R.layout.activity_main);
 		
 		TextView tvWorkaround = (TextView)findViewById(R.id.text_workaround);

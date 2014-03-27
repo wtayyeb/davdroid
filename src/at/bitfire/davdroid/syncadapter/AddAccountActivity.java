@@ -19,13 +19,15 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import at.bitfire.davdroid.Constants;
 import at.bitfire.davdroid.R;
+import at.bitfire.davdroid.webdav.TlsSniSocketFactory;
 
 public class AddAccountActivity extends Activity {
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
-		
+
+		TlsSniSocketFactory.setAndroidContext(getApplicationContext());
 		setContentView(R.layout.add_account);
 		
 		if (savedInstanceState == null) {	// first call

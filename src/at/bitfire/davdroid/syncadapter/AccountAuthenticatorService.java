@@ -20,6 +20,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.IBinder;
+import at.bitfire.davdroid.webdav.TlsSniSocketFactory;
 
 public class AccountAuthenticatorService extends Service {
 	private static AccountAuthenticator accountAuthenticator;
@@ -44,6 +45,8 @@ public class AccountAuthenticatorService extends Service {
 		public AccountAuthenticator(Context context) {
 			super(context);
 			this.context = context;
+
+			TlsSniSocketFactory.setAndroidContext(context);
 		}
 
 		@Override

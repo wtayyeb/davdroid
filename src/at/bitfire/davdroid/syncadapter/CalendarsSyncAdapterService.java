@@ -27,6 +27,7 @@ import at.bitfire.davdroid.resource.CalDavCalendar;
 import at.bitfire.davdroid.resource.LocalCalendar;
 import at.bitfire.davdroid.resource.LocalCollection;
 import at.bitfire.davdroid.resource.RemoteCollection;
+import at.bitfire.davdroid.webdav.TlsSniSocketFactory;
 
 public class CalendarsSyncAdapterService extends Service {
 	private static SyncAdapter syncAdapter;
@@ -56,6 +57,8 @@ public class CalendarsSyncAdapterService extends Service {
 		
 		private SyncAdapter(Context context) {
 			super(context);
+
+			TlsSniSocketFactory.setAndroidContext(context);
 		}
 		
 		@Override
