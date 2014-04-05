@@ -14,9 +14,7 @@ import lombok.Cleanup;
 import org.apache.commons.io.IOUtils;
 
 import android.content.res.AssetManager;
-import android.os.Build;
 import android.test.InstrumentationTestCase;
-import android.util.Log;
 import at.bitfire.davdroid.webdav.DavException;
 import at.bitfire.davdroid.webdav.DavHttpClient;
 import at.bitfire.davdroid.webdav.DavMultiget;
@@ -31,8 +29,6 @@ import ch.boye.httpclientandroidlib.impl.client.CloseableHttpClient;
 // tests require running robohydra!
 
 public class WebDavResourceTest extends InstrumentationTestCase {
-	private static final String TAG = "davdroidTest.WebDavResourceTest";
-	
 	static final String ROBOHYDRA_BASE = "http://10.0.0.11:3000/";
 	static byte[] SAMPLE_CONTENT = new byte[] { 1, 2, 3, 4, 5 };
 	
@@ -166,20 +162,14 @@ public class WebDavResourceTest extends InstrumentationTestCase {
 	public void testGetHttpsWithSni() throws URISyntaxException, HttpException, IOException, DavException {
 		WebDavResource file = new WebDavResource(httpClient, new URI("https://sni.velox.ch"), false);
 		
-		boolean	sniWorking;
+		boolean	sniWorking = false;
 		try {
 			file.get();
 			sniWorking = true; 
 		} catch (SSLPeerUnverifiedException e) {
-			sniWorking = false;
 		}
 		
-		if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
-			// SNI should be available in Android 4.2+
-			assertTrue(sniWorking);
-		} else
-			Log.i(TAG, "SNI not tested (only available in Android 4.2+)");
-		
+		assertTrue(sniWorking);
 	}
 	
 	public void testMultiGet() throws DavException, IOException, HttpException {

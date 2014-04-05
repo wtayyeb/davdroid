@@ -39,12 +39,12 @@ public class TlsSniSocketFactory implements LayeredConnectionSocketFactory {
 	final static TlsSniSocketFactory INSTANCE = new TlsSniSocketFactory();
 
 	// Android context used to show the self-signed certificate dialog.
-	Context androidContext;
+	static Context androidContext;
 	
 	private final static SSLCertificateSocketFactory sslSocketFactory = (SSLCertificateSocketFactory) SSLCertificateSocketFactory.getDefault(0);
 	private final static HostnameVerifier hostnameVerifier = new BrowserCompatHostnameVerifier();
 	
-	
+
 	/**
 	 * Private constructor (to make sure the only access is through the {@link #INSTANCE} singleton.
 	 */
@@ -59,25 +59,30 @@ public class TlsSniSocketFactory implements LayeredConnectionSocketFactory {
 	 * @param context
 	 */
 	public static void setAndroidContext(Context context) {
-		INSTANCE.androidContext = context;
+		androidContext = context;
+		sslSocketFactory.setTrustManagers(MemorizingTrustManager.getInstanceList(androidContext));
 	}
 
+	/**
+	 * Check that we have an android {@link Context} set.
+	 */
+	private void verifyAndroidContextSet() {
+		if (androidContext == null)
+			Log.wtf(TAG, "sockets should not be created before setAndroidContext is called");
+	}
 	
-	// Plain TCP/IP (layer below TLS)
-
 	@Override
 	public Socket createSocket(HttpContext context) throws IOException {
+		verifyAndroidContextSet();
 		return sslSocketFactory.createSocket();
 	}
 
 	@Override
 	public Socket connectSocket(int timeout, Socket socket, HttpHost host, InetSocketAddress remoteAddr, InetSocketAddress localAddr, HttpContext context) throws IOException {
-		// we don't need the non-SSL socket
+		// we'll rather create a new socket
 		socket.close();
-		
-		if (androidContext == null)
-			Log.wtf(TAG, "connectSocket should never be called before setAndroidContext");
-		sslSocketFactory.setTrustManagers(MemorizingTrustManager.getInstanceList(androidContext));
+
+		verifyAndroidContextSet();
 		
 		// create and connect SSL socket, but don't do hostname/certificate verification yet
 		SSLSocket ssl = (SSLSocket)sslSocketFactory.createSocket(remoteAddr.getAddress(), host.getPort());
@@ -85,10 +90,18 @@ public class TlsSniSocketFactory implements LayeredConnectionSocketFactory {
 		
 		// set up SNI before the handshake
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
+			// Android 4.2+, use documented way to set SNI host name
 			Log.d(TAG, "Setting SNI hostname");
 			sslSocketFactory.setHostname(ssl, host.getHostName());
-		} else
-			Log.i(TAG, "No SNI support below Android 4.2!");
+		} else {
+			Log.d(TAG, "No documented SNI support on Android <4.2, trying with reflection");
+			try {
+				java.lang.reflect.Method setHostnameMethod = ssl.getClass().getMethod("setHostname", String.class);
+				setHostnameMethod.invoke(ssl, host.getHostName());
+			} catch (Exception e) {
+				Log.w(TAG, "SNI not useable", e);
+			}
+		}
 		
 		// verify hostname and certificate
 		SSLSession session = ssl.getSession();

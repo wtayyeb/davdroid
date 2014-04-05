@@ -14,7 +14,6 @@ import java.net.URISyntaxException;
 import java.util.HashMap;
 import java.util.Map;
 
-import lombok.Synchronized;
 import android.accounts.Account;
 import android.app.Service;
 import android.content.ContentProviderClient;
@@ -30,9 +29,9 @@ import at.bitfire.davdroid.webdav.TlsSniSocketFactory;
 
 public class ContactsSyncAdapterService extends Service {
 	private static ContactsSyncAdapter syncAdapter;
-	
 
-	@Override @Synchronized
+	
+	@Override
 	public void onCreate() {
 		if (syncAdapter == null)
 			syncAdapter = new ContactsSyncAdapter(getApplicationContext());
@@ -57,7 +56,6 @@ public class ContactsSyncAdapterService extends Service {
 		private ContactsSyncAdapter(Context context) {
 			super(context);
 			TlsSniSocketFactory.setAndroidContext(context);
-			Log.i(TAG, "httpClient = " + httpClient);
 		}
 
 		@Override
@@ -73,7 +71,6 @@ public class ContactsSyncAdapterService extends Service {
 			
 			try {
 				LocalCollection<?> database = new LocalAddressBook(account, provider, settings);
-				Log.i(TAG, "httpClient 2 = " + httpClient);
 				RemoteCollection<?> dav = new CardDavAddressBook(httpClient, addressBookURL, userName, password, preemptive);
 				
 				Map<LocalCollection<?>, RemoteCollection<?>> map = new HashMap<LocalCollection<?>, RemoteCollection<?>>();

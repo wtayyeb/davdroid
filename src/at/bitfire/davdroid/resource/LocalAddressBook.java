@@ -20,10 +20,6 @@ import java.util.Set;
 
 import lombok.Cleanup;
 
-import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang.StringUtils;
-import org.apache.commons.lang.WordUtils;
-
 import android.accounts.Account;
 import android.content.ContentProviderClient;
 import android.content.ContentProviderOperation;
@@ -49,7 +45,11 @@ import android.provider.ContactsContract.CommonDataKinds.Website;
 import android.provider.ContactsContract.Data;
 import android.provider.ContactsContract.RawContacts;
 import android.util.Log;
-import at.bitfire.davdroid.syncadapter.AccountSettings;
+
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang.WordUtils;
+
 import ezvcard.parameter.AddressType;
 import ezvcard.parameter.EmailType;
 import ezvcard.parameter.ImppType;
@@ -61,9 +61,14 @@ import ezvcard.property.DateOrTimeProperty;
 import ezvcard.property.Impp;
 import ezvcard.property.Telephone;
 
+import at.bitfire.davdroid.syncadapter.AccountSettings;
+
 
 public class LocalAddressBook extends LocalCollection<Contact> {
 	private final static String TAG = "davdroid.LocalAddressBook";
+	
+	protected final static String COLUMN_UNKNOWN_PROPERTIES = RawContacts.SYNC3;
+
 	
 	protected AccountSettings accountSettings;
 	
@@ -146,10 +151,11 @@ public class LocalAddressBook extends LocalCollection<Contact> {
 		
 		try {
 			@Cleanup Cursor cursor = providerClient.query(ContentUris.withAppendedId(entriesURI(), c.getLocalID()),
-				new String[] { entryColumnUID(), RawContacts.STARRED }, null, null, null);
+				new String[] { entryColumnUID(), COLUMN_UNKNOWN_PROPERTIES, RawContacts.STARRED }, null, null, null);
 			if (cursor != null && cursor.moveToNext()) {
 				c.setUid(cursor.getString(0));
-				c.setStarred(cursor.getInt(1) != 0);
+				c.setUnknownProperties(cursor.getString(1));
+				c.setStarred(cursor.getInt(2) != 0);
 			} else
 				throw new RecordNotFoundException();
 		
@@ -177,6 +183,7 @@ public class LocalAddressBook extends LocalCollection<Contact> {
 				/* 6 */ StructuredName.PHONETIC_GIVEN_NAME, StructuredName.PHONETIC_MIDDLE_NAME, StructuredName.PHONETIC_FAMILY_NAME
 			}, StructuredName.RAW_CONTACT_ID + "=? AND " + Data.MIMETYPE + "=?",
 			new String[] { String.valueOf(c.getLocalID()), StructuredName.CONTENT_ITEM_TYPE }, null);
+		
 		if (cursor != null && cursor.moveToNext()) {
 			c.setDisplayName(cursor.getString(0));
 			
@@ -299,22 +306,31 @@ public class LocalAddressBook extends LocalCollection<Contact> {
 	}
 	
 	protected void populatePhoto(Contact c) throws RemoteException {
-		Uri photoUri = Uri.withAppendedPath(
-	             ContentUris.withAppendedId(RawContacts.CONTENT_URI, c.getLocalID()),
-	             RawContacts.DisplayPhoto.CONTENT_DIRECTORY);
-		try {
-			@Cleanup AssetFileDescriptor fd = providerClient.openAssetFile(photoUri, "r");
-			@Cleanup InputStream is = fd.createInputStream();
-			c.setPhoto(IOUtils.toByteArray(is));
-		} catch(IOException ex) {
-			Log.v(TAG, "Couldn't read contact photo", ex);
+		@Cleanup Cursor cursor = providerClient.query(dataURI(),
+				new String[] { Photo.PHOTO_FILE_ID, Photo.PHOTO },
+				Photo.RAW_CONTACT_ID + "=? AND " + Data.MIMETYPE + "=?",
+				new String[] { String.valueOf(c.getLocalID()), Photo.CONTENT_ITEM_TYPE }, null);
+		if (cursor != null && cursor.moveToNext()) {
+			if (!cursor.isNull(0)) {
+				Uri photoUri = Uri.withAppendedPath(
+			             ContentUris.withAppendedId(RawContacts.CONTENT_URI, c.getLocalID()),
+			             RawContacts.DisplayPhoto.CONTENT_DIRECTORY);
+				try {
+					@Cleanup AssetFileDescriptor fd = providerClient.openAssetFile(photoUri, "r");
+					@Cleanup InputStream is = fd.createInputStream();
+					c.setPhoto(IOUtils.toByteArray(is));
+				} catch(IOException ex) {
+					Log.w(TAG, "Couldn't read high-res contact photo", ex);
+				}
+			} else
+				c.setPhoto(cursor.getBlob(1));
 		}
 	}
 	
 	protected void populateOrganization(Contact c) throws RemoteException {
 		@Cleanup Cursor cursor = providerClient.query(dataURI(),
 				new String[] { Organization.COMPANY, Organization.DEPARTMENT, Organization.TITLE, Organization.JOB_DESCRIPTION },
-				Photo.RAW_CONTACT_ID + "=? AND " + Data.MIMETYPE + "=?",
+				Organization.RAW_CONTACT_ID + "=? AND " + Data.MIMETYPE + "=?",
 				new String[] { String.valueOf(c.getLocalID()), Organization.CONTENT_ITEM_TYPE }, null);
 		if (cursor != null && cursor.moveToNext()) {
 			String	company = cursor.getString(0),
@@ -338,7 +354,7 @@ public class LocalAddressBook extends LocalCollection<Contact> {
 	
 	protected void populateIMPPs(Contact c) throws RemoteException {
 		@Cleanup Cursor cursor = providerClient.query(dataURI(), new String[] { Im.DATA, Im.TYPE, Im.LABEL, Im.PROTOCOL, Im.CUSTOM_PROTOCOL },
-				Photo.RAW_CONTACT_ID + "=? AND " + Data.MIMETYPE + "=?",
+				Im.RAW_CONTACT_ID + "=? AND " + Data.MIMETYPE + "=?",
 				new String[] { String.valueOf(c.getLocalID()), Im.CONTENT_ITEM_TYPE }, null);
 		while (cursor != null && cursor.moveToNext()) {
 			String handle = cursor.getString(0);
@@ -404,7 +420,7 @@ public class LocalAddressBook extends LocalCollection<Contact> {
 	
 	protected void populateNote(Contact c) throws RemoteException {
 		@Cleanup Cursor cursor = providerClient.query(dataURI(), new String[] { Note.NOTE },
-				Website.RAW_CONTACT_ID + "=? AND " + Data.MIMETYPE + "=?",
+				Note.RAW_CONTACT_ID + "=? AND " + Data.MIMETYPE + "=?",
 				new String[] { String.valueOf(c.getLocalID()), Note.CONTENT_ITEM_TYPE }, null);
 		if (cursor != null && cursor.moveToNext())
 			c.setNote(cursor.getString(0));
@@ -478,9 +494,9 @@ public class LocalAddressBook extends LocalCollection<Contact> {
 	
 	protected void populateSipAddress(Contact c) throws RemoteException {
 		@Cleanup Cursor cursor = providerClient.query(dataURI(),
-				new String[] { CommonDataKinds.SipAddress.SIP_ADDRESS, CommonDataKinds.SipAddress.TYPE, CommonDataKinds.SipAddress.LABEL },
-				Website.RAW_CONTACT_ID + "=? AND " + Data.MIMETYPE + "=?",
-				new String[] { String.valueOf(c.getLocalID()), CommonDataKinds.SipAddress.CONTENT_ITEM_TYPE }, null);
+				new String[] { SipAddress.SIP_ADDRESS, SipAddress.TYPE, SipAddress.LABEL },
+				SipAddress.RAW_CONTACT_ID + "=? AND " + Data.MIMETYPE + "=?",
+				new String[] { String.valueOf(c.getLocalID()), SipAddress.CONTENT_ITEM_TYPE }, null);
 		if (cursor != null && cursor.moveToNext()) {
 			Impp impp = new Impp("sip:" + cursor.getString(0));
 			switch (cursor.getInt(1)) {
@@ -512,6 +528,7 @@ public class LocalAddressBook extends LocalCollection<Contact> {
 			.withValue(entryColumnRemoteName(), contact.getName())
 			.withValue(entryColumnUID(), contact.getUid())
 			.withValue(entryColumnETag(), contact.getETag())
+			.withValue(COLUMN_UNKNOWN_PROPERTIES, contact.getUnknownProperties())
 			.withValue(RawContacts.STARRED, contact.isStarred());
 	}
 	
@@ -519,8 +536,8 @@ public class LocalAddressBook extends LocalCollection<Contact> {
 	@Override
 	protected void addDataRows(Resource resource, long localID, int backrefIdx) {
 		Contact contact = (Contact)resource;
-		
-		pendingOperations.add(buildStructuredName(newDataInsertBuilder(localID, backrefIdx), contact).build());
+
+		queueOperation(buildStructuredName(newDataInsertBuilder(localID, backrefIdx), contact));
 		
 		for (Telephone number : contact.getPhoneNumbers())
 			queueOperation(buildPhoneNumber(newDataInsertBuilder(localID, backrefIdx), number));
@@ -531,9 +548,7 @@ public class LocalAddressBook extends LocalCollection<Contact> {
 		if (contact.getPhoto() != null)
 			queueOperation(buildPhoto(newDataInsertBuilder(localID, backrefIdx), contact.getPhoto()));
 		
-		if (contact.getOrganization() != null || contact.getJobTitle() != null || contact.getJobDescription() != null)
-			queueOperation(buildOrganization(newDataInsertBuilder(localID, backrefIdx),
-				contact.getOrganization(), contact.getJobTitle(), contact.getJobDescription()));
+		queueOperation(buildOrganization(newDataInsertBuilder(localID, backrefIdx), contact));
 			
 		for (Impp impp : contact.getImpps())
 			queueOperation(buildIMPP(newDataInsertBuilder(localID, backrefIdx), impp));
@@ -560,7 +575,7 @@ public class LocalAddressBook extends LocalCollection<Contact> {
 		
 		// TODO relations
 		
-		// SIP addresses built by buildIMPP
+		// SIP addresses are built by buildIMPP
 	}
 	
 	@Override
@@ -695,9 +710,12 @@ public class LocalAddressBook extends LocalCollection<Contact> {
 			.withValue(Photo.PHOTO, photo);
 	}
 	
-	protected Builder buildOrganization(Builder builder, ezvcard.property.Organization organization, String jobTitle, String jobDescription) {
+	protected Builder buildOrganization(Builder builder, Contact contact) {
+		if (contact.getOrganization() == null && contact.getJobTitle() == null && contact.getJobDescription() == null)
+			return null;
+
+		ezvcard.property.Organization organization = contact.getOrganization();
 		String company = null, department = null;
-		
 		if (organization != null) {
 			Iterator<String> org = organization.getValues().iterator();
 			if (org.hasNext())
@@ -710,8 +728,8 @@ public class LocalAddressBook extends LocalCollection<Contact> {
 				.withValue(Data.MIMETYPE, Organization.CONTENT_ITEM_TYPE)
 				.withValue(Organization.COMPANY, company)
 				.withValue(Organization.DEPARTMENT, department)
-				.withValue(Organization.TITLE, jobTitle)
-				.withValue(Organization.JOB_DESCRIPTION, jobDescription);
+				.withValue(Organization.TITLE, contact.getJobTitle())
+				.withValue(Organization.JOB_DESCRIPTION, contact.getJobDescription());
 	}
 
 	protected Builder buildIMPP(Builder builder, Impp impp) {

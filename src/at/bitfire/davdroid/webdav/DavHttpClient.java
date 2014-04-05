@@ -56,6 +56,7 @@ public class DavHttpClient {
 				.useSystemProperties()
 				.setConnectionManager(connectionManager)
 				.setDefaultRequestConfig(defaultRqConfig)
+				.setRetryHandler(DavHttpRequestRetryHandler.INSTANCE)
 				.setUserAgent("DAVdroid/" + Constants.APP_VERSION)
 				.disableCookieManagement()
 				.build();
