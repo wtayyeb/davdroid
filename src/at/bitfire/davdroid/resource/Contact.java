@@ -26,6 +26,7 @@ import ezvcard.Ezvcard;
 import ezvcard.VCard;
 import ezvcard.VCardException;
 import ezvcard.VCardVersion;
+import ezvcard.ValidationWarnings;
 import ezvcard.parameter.EmailType;
 import ezvcard.parameter.ImageType;
 import ezvcard.parameter.TelephoneType;
@@ -264,9 +265,11 @@ public class Contact extends Resource {
 		vcard.removeProperties(Source.class);
 		// store all remaining properties into unknownProperties
 		if (!vcard.getProperties().isEmpty() || !vcard.getExtendedProperties().isEmpty())
-			unknownProperties = vcard.write();
-		else
-			unknownProperties = null;
+			try {
+				unknownProperties = vcard.write();
+			} catch(Exception e) {
+				Log.w(TAG, "Couldn't store unknown properties (maybe illegal syntax), dropping them");
+			}
 	}
 
 	
@@ -372,6 +375,11 @@ public class Contact extends Resource {
 		// PRODID, REV
 		vcard.setProdId("DAVdroid/" + Constants.APP_VERSION + " (ez-vcard/" + Ezvcard.VERSION + ")");
 		vcard.setRevision(Revision.now());
+		
+		// validate and print warnings
+		ValidationWarnings warnings = vcard.validate(VCardVersion.V3_0);
+		if (!warnings.isEmpty())
+			Log.w(TAG, "Created potentially invalid VCard! " + warnings);
 		
 		ByteArrayOutputStream os = new ByteArrayOutputStream();
 		Ezvcard
