@@ -96,13 +96,14 @@ public class TlsSniSocketFactory implements LayeredConnectionSocketFactory {
 	@Override
 	public Socket connectSocket(int timeout, Socket plain, HttpHost host, InetSocketAddress remoteAddr, InetSocketAddress localAddr, HttpContext context) throws IOException {
 		Log.d(TAG, "Preparing direct SSL connection (without proxy) to " + host);
+		
+		// Context required
+		verifyAndroidContextSet();
 
 		// we'll rather use an SSLSocket directly
 		plain.close();
 		
 		// create a plain SSL socket, but don't do hostname/certificate verification yet
-		verifyAndroidContextSet();
-		
 		SSLSocket ssl = (SSLSocket)sslSocketFactory.createSocket(remoteAddr.getAddress(), host.getPort());
 		
 		// connect, set SNI, shake hands, verify, print connection info
@@ -149,7 +150,6 @@ public class TlsSniSocketFactory implements LayeredConnectionSocketFactory {
 		// verify hostname and certificate
 		SSLSession session = ssl.getSession();
 		if (!hostnameVerifier.verify(host, session))
-
 			throw new SSLPeerUnverifiedException("Cannot verify hostname: " + host);
 
 		Log.i(TAG, "Established " + session.getProtocol() + " connection with " + session.getPeerHost() +
